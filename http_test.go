@@ -61,7 +61,25 @@ func TestOmitsAuthorizationForUnauthenticatedRequestsAndKeylessClients(t *testin
 
 	c := New("") // keyless
 	var out map[string]any
-	if err := c.do(context.Background(), apiRequest{method: "GET", path: "/v1/plans", authenticated: false}, &out); err != nil {
+	if err := c.do(context.Background(), apiRequest{method: "GET", path: "/v1/plans"}, &out); err != nil {
+		t.Fatalf("do: %v", err)
+	}
+	if gotAuth != "" {
+		t.Fatalf("auth = %q", gotAuth)
+	}
+}
+
+func TestOmitsAuthorizationOnNoAuthRequestWithKeyedClient(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	c := New("nt_live_secret", WithBaseURL(srv.URL))
+	var out map[string]any
+	if err := c.do(context.Background(), apiRequest{method: "GET", path: "/v1/plans", noAuth: true}, &out); err != nil {
 		t.Fatalf("do: %v", err)
 	}
 	if gotAuth != "" {

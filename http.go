@@ -17,20 +17,14 @@ import (
 const version = "1.0.0"
 
 type apiRequest struct {
-	method        string
-	path          string
-	query         url.Values
-	body          any  // struct or map; nil for no body
-	authenticated bool // defaults to true in do
+	method string
+	path   string
+	query  url.Values
+	body   any  // struct or map; nil for no body
+	noAuth bool // suppress the Authorization header (public routes on a keyed client)
 }
 
 func (c *Client) do(ctx context.Context, req apiRequest, out any) error {
-	// apiRequest.authenticated defaults to true: the zero value is an
-	// authenticated call. Anonymous groups use a keyless Client (or a
-	// public endpoint that ignores the header).
-	if !req.authenticated {
-		req.authenticated = true
-	}
 	idempotent := req.method != http.MethodPost || hasIdempotencyKey(req.body)
 
 	var bodyBytes []byte
@@ -79,7 +73,7 @@ func (c *Client) attempt(ctx context.Context, req apiRequest, bodyBytes []byte, 
 	if bodyBytes != nil {
 		httpReq.Header.Set("Content-Type", "application/json")
 	}
-	if req.authenticated && c.apiKey != "" {
+	if !req.noAuth && c.apiKey != "" {
 		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
 	}
 
