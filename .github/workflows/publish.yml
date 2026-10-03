@@ -1,0 +1,25 @@
+name: publish
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Verify release tag is a Go module semver tag
+        run: |
+          if ! echo "${{ github.event.release.tag_name }}" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Release tag must be v<major>.<minor>.<patch> (Go modules); got ${{ github.event.release.tag_name }}"
+            exit 1
+          fi
+      - name: gofmt
+        run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test ./... -race
+      # No publish step: the tag IS the release; the Go module proxy ingests it.
