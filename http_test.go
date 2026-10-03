@@ -51,7 +51,7 @@ func TestPostsJSONWithBearerAuthAndUserAgent(t *testing.T) {
 	}
 }
 
-func TestOmitsAuthorizationForUnauthenticatedRequestsAndKeylessClients(t *testing.T) {
+func TestOmitsAuthorizationForKeylessClient(t *testing.T) {
 	var gotAuth string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotAuth = r.Header.Get("Authorization")
@@ -59,7 +59,7 @@ func TestOmitsAuthorizationForUnauthenticatedRequestsAndKeylessClients(t *testin
 	}))
 	defer srv.Close()
 
-	c := New("") // keyless
+	c := New("", WithBaseURL(srv.URL)) // keyless
 	var out map[string]any
 	if err := c.do(context.Background(), apiRequest{method: "GET", path: "/v1/plans"}, &out); err != nil {
 		t.Fatalf("do: %v", err)
