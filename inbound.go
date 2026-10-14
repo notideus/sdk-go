@@ -139,7 +139,7 @@ type InboundMessage struct {
 	Subject     string              `json:"subject"`
 	Text        string              `json:"text"`
 	HTML        string              `json:"html"`
-	Headers     map[string]string   `json:"headers"`
+	Headers     map[string]string   `json:"headers"` // keys are lowercased server-side
 	Attachments []InboundAttachment `json:"attachments"`
 	SpamVerdict *string             `json:"spam_verdict"`
 	SizeKb      int32               `json:"size_kb"`

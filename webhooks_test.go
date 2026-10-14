@@ -365,7 +365,7 @@ func TestDoBinaryNoDispositionFallsBackToEmptyFilename(t *testing.T) {
 func TestDoBinaryEnvelopeErrorOnNotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error":{"code":"inbound_message_not_found","message":"no such message"}}`))
+		_, _ = w.Write([]byte(`{"error":{"code":"not_found","message":"inbound message not found"}}`))
 	}))
 	defer srv.Close()
 
@@ -378,7 +378,7 @@ func TestDoBinaryEnvelopeErrorOnNotFound(t *testing.T) {
 	if !errors.As(err, &ne) {
 		t.Fatalf("error type = %T", err)
 	}
-	if ne.Code != "inbound_message_not_found" || ne.Status != 404 {
+	if ne.Code != "not_found" || ne.Status != 404 {
 		t.Fatalf("error = %+v", ne)
 	}
 }

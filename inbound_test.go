@@ -17,7 +17,7 @@ const testRoute = `{"id":"8a2b","domain_id":"dom1","recipient":"help","name":"Su
 
 const testMessage = `{"id":"em9","route_id":"8a2b","from_addr":"a@example.com","from_name":"Ann",` +
 	`"to_addr":"help@corp.example","subject":"Hi","text":"hello","html":"<p>hello</p>",` +
-	`"headers":{"Message-ID":"<m1@example.com>"},` +
+	`"headers":{"message-id":"<m1@example.com>"},` +
 	`"attachments":[{"name":"report.csv","content_type":"text/csv","size_kb":3,"key":"k1"}],` +
 	`"spam_verdict":"pass","size_kb":12,"status":"received","error":null,` +
 	`"received_at":"2026-10-12T09:00:00Z"}`
@@ -205,7 +205,7 @@ func TestInboundMessagesGetUnwrapsMessage(t *testing.T) {
 	if msg.RouteID == nil || *msg.RouteID != "8a2b" {
 		t.Fatalf("route_id = %v", msg.RouteID)
 	}
-	if msg.Headers["Message-ID"] != "<m1@example.com>" {
+	if msg.Headers["message-id"] != "<m1@example.com>" {
 		t.Fatalf("headers = %v", msg.Headers)
 	}
 	if len(msg.Attachments) != 1 || msg.Attachments[0].Name != "report.csv" ||
@@ -280,7 +280,7 @@ func TestInboundMessagesAttachmentDownloadsByIndex(t *testing.T) {
 func TestInboundBinaryEnvelopeErrorOnNotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error":{"code":"inbound_message_not_found","message":"no such message"}}`))
+		_, _ = w.Write([]byte(`{"error":{"code":"not_found","message":"inbound message not found"}}`))
 	}))
 	defer srv.Close()
 
@@ -293,7 +293,7 @@ func TestInboundBinaryEnvelopeErrorOnNotFound(t *testing.T) {
 	if !errors.As(err, &ne) {
 		t.Fatalf("error type = %T", err)
 	}
-	if ne.Code != "inbound_message_not_found" || ne.Status != 404 {
+	if ne.Code != "not_found" || ne.Status != 404 {
 		t.Fatalf("error = %+v", ne)
 	}
 }
