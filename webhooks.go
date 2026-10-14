@@ -164,6 +164,19 @@ func (s *WebhooksService) Test(ctx context.Context, id string, eventID *string) 
 	return &res.Delivery, nil
 }
 
+// RotateSecret replaces the endpoint's signing secret; the new secret is
+// returned exactly once and the old one stops working immediately.
+//
+// → 200 OK: {endpoint, secret}. See docs/public-api.md → Webhooks.
+func (s *WebhooksService) RotateSecret(ctx context.Context, id string) (*WebhookCreated, error) {
+	var created WebhookCreated
+	err := s.client.do(ctx, apiRequest{method: "POST", path: webhookPath(id) + "/rotate-secret"}, &created)
+	if err != nil {
+		return nil, err
+	}
+	return &created, nil
+}
+
 // Events returns the event catalog with sample payloads (GET
 // /v1/webhooks/meta/events, scope webhooks:read) — drives the dashboard
 // picker. The documented event types include email.sent, email.delivered,

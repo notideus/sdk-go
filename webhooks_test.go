@@ -209,6 +209,28 @@ func TestWebhooksTestWithAndWithoutEvent(t *testing.T) {
 	}
 }
 
+func TestWebhooksRotateSecret(t *testing.T) {
+	const id = "5d1e"
+	var method, path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method, path = r.Method, r.URL.Path
+		_, _ = w.Write([]byte(`{"endpoint":` + testEndpoint + `,"secret":"whsec_rotated"}`))
+	}))
+	defer srv.Close()
+
+	c := New("nt_live_k", WithBaseURL(srv.URL))
+	created, err := c.Webhooks.RotateSecret(context.Background(), id)
+	if err != nil {
+		t.Fatalf("rotate-secret: %v", err)
+	}
+	if method != "POST" || path != "/v1/webhooks/"+id+"/rotate-secret" {
+		t.Fatalf("%s %s", method, path)
+	}
+	if created.Endpoint.ID != "5d1e" || created.Secret != "whsec_rotated" {
+		t.Fatalf("created = %+v", created)
+	}
+}
+
 func TestWebhooksEventsUnwrapsCatalog(t *testing.T) {
 	var method, path string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
