@@ -124,6 +124,37 @@ if page.NextCursor != nil {
 }
 ```
 
+### Webhooks
+
+```go
+created, err := client.Webhooks.Create(ctx, notideus.CreateWebhookParams{
+	Name: "Production API", URL: "https://example.com/hook", Events: []string{"email.delivered"},
+})
+// created.Secret — whsec_…, shown once
+_, err = client.Webhooks.Update(ctx, created.Endpoint.ID, notideus.UpdateWebhookParams{
+	Name: "Production API", URL: "https://example.com/hook",
+	Events: []string{"email.delivered"}, Status: notideus.WebhookEndpointDisabled,
+})
+log, err := client.Webhooks.Deliveries.List(ctx, notideus.WebhookDeliveryListParams{
+	EndpointID: notideus.Ptr(created.Endpoint.ID),
+})
+_, err = client.Webhooks.Deliveries.Redeliver(ctx, log.Data[0].ID)
+events, err := client.Webhooks.Events(ctx)
+```
+
+### Inbound email
+
+```go
+routes, err := client.Inbound.Routes.List(ctx)
+_, err = client.Inbound.Routes.Create(ctx, notideus.CreateInboundRouteParams{
+	DomainID: domainID, Recipient: "support", Store: true,
+})
+inbox, err := client.Inbound.Messages.List(ctx, notideus.InboundMessageListParams{
+	Q: notideus.Ptr("billing"),
+})
+mime, filename, contentType, err := client.Inbound.Messages.Raw(ctx, inbox.Data[0].ID)
+```
+
 ### Hosted unsubscribe (token-based, unauthenticated)
 
 ```go
