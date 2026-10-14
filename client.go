@@ -19,6 +19,7 @@ type Client struct {
 	Emails      *EmailsService
 	WhatsApp    *WhatsAppService
 	Contacts    *ContactsService
+	Webhooks    *WebhooksService
 	Unsubscribe *UnsubscribeService
 	Plans       *PlansService
 }
@@ -53,6 +54,7 @@ func New(apiKey string, opts ...Option) *Client {
 	c.Emails = &EmailsService{client: c}
 	c.WhatsApp = &WhatsAppService{client: c}
 	c.Contacts = &ContactsService{client: c}
+	c.Webhooks = &WebhooksService{client: c, Deliveries: &WebhookDeliveriesService{client: c}}
 	c.Unsubscribe = &UnsubscribeService{client: c}
 	c.Plans = &PlansService{client: c}
 	c.WhatsApp.Messages = &WhatsAppMessagesService{client: c}

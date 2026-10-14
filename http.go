@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"time"
 )
@@ -98,6 +99,58 @@ func (c *Client) attempt(ctx context.Context, req apiRequest, bodyBytes []byte, 
 		return nil
 	}
 	return json.Unmarshal(payload, out)
+}
+
+// doBinary downloads a binary endpoint (raw MIME, attachments): it mirrors
+// attempt's request building (auth, user-agent, no body) but returns the raw
+// response bytes instead of unmarshaling JSON. On a non-2xx status it runs
+// the same envelope error path as do. There are no retries — callers can
+// re-invoke. The filename is parsed from Content-Disposition ("" when the
+// header is absent or unparseable); contentType is the Content-Type header
+// ("" when absent).
+func (c *Client) doBinary(ctx context.Context, req apiRequest) (data []byte, filename string, contentType string, err error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+
+	u := c.baseURL + req.path
+	if len(req.query) > 0 {
+		u += "?" + req.query.Encode()
+	}
+	httpReq, err := http.NewRequestWithContext(ctx, req.method, u, nil)
+	if err != nil {
+		return nil, "", "", err
+	}
+	httpReq.Header.Set("User-Agent", "notideus-go/"+version)
+	if !req.noAuth && c.apiKey != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
+	}
+
+	resp, err := c.http.Do(httpReq)
+	if err != nil {
+		return nil, "", "", &NotideusError{Code: "network_error", Message: err.Error()}
+	}
+	defer resp.Body.Close()
+
+	payload, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", "", &NotideusError{Code: "network_error", Message: err.Error()}
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, "", "", envelopeError(payload, resp.StatusCode, resp.Header)
+	}
+	return payload, contentDispositionFilename(resp.Header.Get("Content-Disposition")), resp.Header.Get("Content-Type"), nil
+}
+
+var contentDispositionFilenameRe = regexp.MustCompile(`filename="?([^";]+)"?`)
+
+// contentDispositionFilename extracts the filename from a Content-Disposition
+// header value, or "" when absent or unparseable.
+func contentDispositionFilename(v string) string {
+	m := contentDispositionFilenameRe.FindStringSubmatch(v)
+	if m == nil {
+		return ""
+	}
+	return m[1]
 }
 
 func envelopeError(payload []byte, status int, h http.Header) *NotideusError {
