@@ -128,6 +128,25 @@ func TestEnvelopeError(t *testing.T) {
 	}
 }
 
+func TestEnvelopeErrorCarriesReason(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"error":{"code":"account_suspended","message":"this account is suspended","reason":"spam complaints"}}`))
+	}))
+	defer srv.Close()
+
+	c := New("k", WithBaseURL(srv.URL), WithMaxRetries(0))
+	var out map[string]any
+	err := c.do(context.Background(), apiRequest{method: "GET", path: "/v1/contacts"}, &out)
+	var ne *NotideusError
+	if !errors.As(err, &ne) {
+		t.Fatalf("err = %v", err)
+	}
+	if ne.Code != "account_suspended" || ne.Reason != "spam complaints" {
+		t.Fatalf("ne = %+v", ne)
+	}
+}
+
 func TestParsesRetryAfterOn429(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Retry-After", "7")

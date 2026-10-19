@@ -183,6 +183,7 @@ if errors.As(err, &ne) {
 		_ = ne.RetryAfter // seconds to wait
 	}
 	_ = ne.Status // HTTP status; 0 for transport failures (code "network_error")
+	_ = ne.Reason // optional admin note on account_suspended
 }
 ```
 

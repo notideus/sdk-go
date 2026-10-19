@@ -158,9 +158,11 @@ func envelopeError(payload []byte, status int, h http.Header) *NotideusError {
 		Error *struct {
 			Code    string `json:"code"`
 			Message string `json:"message"`
+			Reason  string `json:"reason"`
 		} `json:"error"`
 	}
 	code, message := "unknown_error", fmt.Sprintf("HTTP %d", status)
+	var reason string
 	if json.Unmarshal(payload, &parsed) == nil && parsed.Error != nil {
 		if parsed.Error.Code != "" {
 			code = parsed.Error.Code
@@ -168,8 +170,9 @@ func envelopeError(payload []byte, status int, h http.Header) *NotideusError {
 		if parsed.Error.Message != "" {
 			message = parsed.Error.Message
 		}
+		reason = parsed.Error.Reason
 	}
-	e := &NotideusError{Code: code, Message: message, Status: status}
+	e := &NotideusError{Code: code, Message: message, Status: status, Reason: reason}
 	if ra := h.Get("Retry-After"); ra != "" {
 		if n, err := strconv.Atoi(ra); err == nil {
 			e.RetryAfter = n
