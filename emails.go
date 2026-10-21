@@ -16,6 +16,8 @@ type SendEmailParams struct {
 	Headers        map[string]string `json:"headers,omitempty"`
 	ReplyTo        string            `json:"reply_to,omitempty"`
 	IdempotencyKey *string           `json:"idempotency_key,omitempty"`
+	TrackOpens     bool              `json:"track_opens,omitempty"`
+	TrackClicks    bool              `json:"track_clicks,omitempty"`
 }
 
 // Email is the stored email row returned by sends.
