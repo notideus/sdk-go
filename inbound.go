@@ -146,14 +146,23 @@ type InboundMessage struct {
 	Status      string              `json:"status"`
 	Error       *string             `json:"error"`
 	ReceivedAt  string              `json:"received_at"`
+	ReadAt      *string             `json:"read_at"`
+	Starred     bool                `json:"starred"`
+	Folder      string              `json:"folder"`
+	FolderID    *string             `json:"folder_id"`
 }
 
 // InboundMessageListParams filters the team inbox; nil fields are skipped.
 type InboundMessageListParams struct {
-	Q       *string
-	RouteID *string
-	Cursor  *string
-	Limit   *int32
+	Q           *string
+	RouteID     *string
+	Folder      *string
+	FolderID    *string
+	Unread      *bool
+	Attachments *bool
+	Sort        *string
+	Cursor      *string
+	Limit       *int32
 }
 
 // InboundMessagesPage is one page of the team inbox.
@@ -177,6 +186,21 @@ func (s *InboundMessagesService) List(ctx context.Context, params InboundMessage
 	}
 	if params.RouteID != nil {
 		q.Set("route_id", *params.RouteID)
+	}
+	if params.Folder != nil {
+		q.Set("folder", *params.Folder)
+	}
+	if params.FolderID != nil {
+		q.Set("folder_id", *params.FolderID)
+	}
+	if params.Unread != nil {
+		q.Set("unread", strconv.FormatBool(*params.Unread))
+	}
+	if params.Attachments != nil {
+		q.Set("attachments", strconv.FormatBool(*params.Attachments))
+	}
+	if params.Sort != nil {
+		q.Set("sort", *params.Sort)
 	}
 	if params.Cursor != nil {
 		q.Set("cursor", *params.Cursor)
@@ -206,6 +230,34 @@ func (s *InboundMessagesService) Get(ctx context.Context, id string) (*InboundMe
 	return &res.Message, nil
 }
 
+// UpdateInboundMessageParams is a partial mailbox-state update. Folder accepts
+// inbox, archive, or trash; FolderID assigns one team-owned custom folder.
+type UpdateInboundMessageParams struct {
+	Read     *bool   `json:"read,omitempty"`
+	Starred  *bool   `json:"starred,omitempty"`
+	Folder   *string `json:"folder,omitempty"`
+	FolderID *string `json:"folder_id,omitempty"`
+}
+
+// Update applies mailbox state to one message (PATCH
+// /v1/inbound/messages/:id, scope inbound:write).
+func (s *InboundMessagesService) Update(ctx context.Context, id string, params UpdateInboundMessageParams) (*InboundMessage, error) {
+	var res struct {
+		Message InboundMessage `json:"message"`
+	}
+	err := s.client.do(ctx, apiRequest{method: "PATCH", path: inboundMessagePath(id), body: params}, &res)
+	if err != nil {
+		return nil, err
+	}
+	return &res.Message, nil
+}
+
+// Delete permanently removes a message already in Trash (DELETE
+// /v1/inbound/messages/:id, scope inbound:write) → 204.
+func (s *InboundMessagesService) Delete(ctx context.Context, id string) error {
+	return s.client.do(ctx, apiRequest{method: "DELETE", path: inboundMessagePath(id)}, nil)
+}
+
 // Raw downloads the raw MIME of one message (GET /v1/inbound/messages/:id/raw,
 // scope inbound:read; message/rfc822). Returns the bytes, the
 // Content-Disposition filename ("" when absent), and the Content-Type. No
@@ -222,12 +274,82 @@ func (s *InboundMessagesService) Attachment(ctx context.Context, messageID strin
 	return s.client.doBinary(ctx, apiRequest{method: "GET", path: inboundMessagePath(messageID) + "/attachments/" + strconv.Itoa(index)})
 }
 
+// InboxFolder is a team-owned custom mailbox folder.
+type InboxFolder struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// InboxCounts contains global mailbox counts used by navigation.
+type InboxCounts struct {
+	Inbox   int64 `json:"inbox"`
+	Unread  int64 `json:"unread"`
+	Starred int64 `json:"starred"`
+	Archive int64 `json:"archive"`
+	Trash   int64 `json:"trash"`
+	All     int64 `json:"all"`
+}
+
+// InboxFoldersPage is the custom-folder list plus global and per-route counts.
+type InboxFoldersPage struct {
+	Data        []InboxFolder    `json:"data"`
+	Counts      InboxCounts      `json:"counts"`
+	RouteUnread map[string]int64 `json:"route_unread"`
+}
+
+// InboundFoldersService manages custom mailbox folders.
+type InboundFoldersService struct {
+	client *Client
+}
+
+// List returns custom folders and mailbox counts (GET /v1/inbound/folders).
+func (s *InboundFoldersService) List(ctx context.Context) (*InboxFoldersPage, error) {
+	var page InboxFoldersPage
+	err := s.client.do(ctx, apiRequest{method: "GET", path: "/v1/inbound/folders"}, &page)
+	if err != nil {
+		return nil, err
+	}
+	return &page, nil
+}
+
+// Create adds a custom folder (POST /v1/inbound/folders, scope inbound:write).
+func (s *InboundFoldersService) Create(ctx context.Context, name string) (*InboxFolder, error) {
+	var res struct {
+		Folder InboxFolder `json:"folder"`
+	}
+	err := s.client.do(ctx, apiRequest{method: "POST", path: "/v1/inbound/folders", body: map[string]string{"name": name}}, &res)
+	if err != nil {
+		return nil, err
+	}
+	return &res.Folder, nil
+}
+
+// Update renames a custom folder (PATCH /v1/inbound/folders/:id).
+func (s *InboundFoldersService) Update(ctx context.Context, id, name string) (*InboxFolder, error) {
+	var res struct {
+		Folder InboxFolder `json:"folder"`
+	}
+	err := s.client.do(ctx, apiRequest{method: "PATCH", path: "/v1/inbound/folders/" + url.PathEscape(id), body: map[string]string{"name": name}}, &res)
+	if err != nil {
+		return nil, err
+	}
+	return &res.Folder, nil
+}
+
+// Delete removes a custom folder; its messages return to Inbox.
+func (s *InboundFoldersService) Delete(ctx context.Context, id string) error {
+	return s.client.do(ctx, apiRequest{method: "DELETE", path: "/v1/inbound/folders/" + url.PathEscape(id)}, nil)
+}
+
 // InboundService groups the inbound email surface: Routes manages receiving
 // routes on the team's verified domains; Messages is the team inbox.
 type InboundService struct {
 	client   *Client
 	Routes   *InboundRoutesService
 	Messages *InboundMessagesService
+	Folders  *InboundFoldersService
 }
 
 func inboundRoutePath(id string) string {

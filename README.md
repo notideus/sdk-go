@@ -85,6 +85,21 @@ client.Emails.Send(ctx, notideus.SendEmailParams{
 client.Emails.SendBatch(ctx, []notideus.SendEmailParams{…}) // up to 100
 ```
 
+### Automation events
+
+Send a custom event to start every active automation that matches its name. Set exactly one recipient: `Email` or `ContactID`. The `202 Accepted` response confirms asynchronous dispatch, not email delivery.
+
+```go
+result, err := client.Events.Send(ctx, notideus.SendEventParams{
+    Event: "user.created",
+    Email: "ada@example.com", // or: ContactID: "contact-uuid"
+    Payload: map[string]any{"first_name": "Ada", "plan": "Pro"},
+    IdempotencyKey: notideus.Ptr("signup-42"),
+})
+```
+
+Top-level payload fields fill matching template variables; `{{email}}` and `{{event_name}}` are built in. Replaying an `IdempotencyKey` returns the same event with `Created: false` and never creates a duplicate run.
+
 ### WhatsApp messages
 
 ```go

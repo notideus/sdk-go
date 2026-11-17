@@ -26,6 +26,8 @@ func TestEmailsSend(t *testing.T) {
 	email, err := c.Emails.Send(context.Background(), SendEmailParams{
 		From:           "Acme Inc <noreply@acme.com>",
 		To:             []string{"jane@example.com"},
+		CC:             []string{"copy@example.com"},
+		BCC:            []string{"archive@example.com"},
 		Subject:        "Welcome",
 		HTML:           "<p>Hi {{name}}</p>",
 		Variables:      map[string]string{"name": "Jane"},
@@ -41,7 +43,8 @@ func TestEmailsSend(t *testing.T) {
 	if path != "/v1/emails" || method != "POST" {
 		t.Fatalf("%s %s", method, path)
 	}
-	if body["from"] != "Acme Inc <noreply@acme.com>" || body["idempotency_key"] != "req-123" {
+	if body["from"] != "Acme Inc <noreply@acme.com>" || body["idempotency_key"] != "req-123" ||
+		body["cc"].([]any)[0] != "copy@example.com" || body["bcc"].([]any)[0] != "archive@example.com" {
 		t.Fatalf("body = %v", body)
 	}
 }

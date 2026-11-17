@@ -20,7 +20,7 @@ const testMessage = `{"id":"em9","route_id":"8a2b","from_addr":"a@example.com","
 	`"headers":{"message-id":"<m1@example.com>"},` +
 	`"attachments":[{"name":"report.csv","content_type":"text/csv","size_kb":3,"key":"k1"}],` +
 	`"spam_verdict":"pass","size_kb":12,"status":"received","error":null,` +
-	`"received_at":"2026-10-12T09:00:00Z"}`
+	`"received_at":"2026-10-12T09:00:00Z","read_at":null,"starred":false,"folder":"inbox","folder_id":null}`
 
 func TestInboundRoutesListIncludesMeta(t *testing.T) {
 	var method, path string
@@ -295,5 +295,81 @@ func TestInboundBinaryEnvelopeErrorOnNotFound(t *testing.T) {
 	}
 	if ne.Code != "not_found" || ne.Status != 404 {
 		t.Fatalf("error = %+v", ne)
+	}
+}
+
+func TestInboundMailboxFiltersAndMutations(t *testing.T) {
+	var calls []string
+	var query url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		switch {
+		case r.Method == "GET" && r.URL.Path == "/v1/inbound/messages":
+			query = r.URL.Query()
+			_, _ = w.Write([]byte(`{"data":[],"next_cursor":""}`))
+		case r.Method == "PATCH" && r.URL.Path == "/v1/inbound/messages/em9":
+			_, _ = w.Write([]byte(`{"message":` + testMessage + `}`))
+		case r.Method == "DELETE" && r.URL.Path == "/v1/inbound/messages/em9":
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	c := New("nt_live_k", WithBaseURL(srv.URL))
+	if _, err := c.Inbound.Messages.List(context.Background(), InboundMessageListParams{
+		Folder: Ptr("starred"), FolderID: Ptr("f1"), Unread: Ptr(true), Attachments: Ptr(true), Sort: Ptr("oldest"),
+	}); err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if query.Get("folder") != "starred" || query.Get("folder_id") != "f1" || query.Get("unread") != "true" || query.Get("attachments") != "true" || query.Get("sort") != "oldest" {
+		t.Fatalf("query = %v", query)
+	}
+	msg, err := c.Inbound.Messages.Update(context.Background(), "em9", UpdateInboundMessageParams{Read: Ptr(true), Starred: Ptr(true)})
+	if err != nil || msg.Folder != "inbox" {
+		t.Fatalf("update: %+v, %v", msg, err)
+	}
+	if err := c.Inbound.Messages.Delete(context.Background(), "em9"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if len(calls) != 3 || calls[1] != "PATCH /v1/inbound/messages/em9" || calls[2] != "DELETE /v1/inbound/messages/em9" {
+		t.Fatalf("calls = %v", calls)
+	}
+}
+
+func TestInboundFoldersCRUD(t *testing.T) {
+	var calls []string
+	folder := `{"id":"f1","name":"Follow up","created_at":"2026-11-17T10:00:00Z","updated_at":"2026-11-17T10:00:00Z"}`
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls = append(calls, r.Method+" "+r.URL.Path)
+		if r.Method == "DELETE" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method == "GET" {
+			_, _ = w.Write([]byte(`{"data":[` + folder + `],"counts":{"inbox":1,"unread":1,"starred":0,"archive":0,"trash":0,"all":1},"route_unread":{"8a2b":1}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"folder":` + folder + `}`))
+	}))
+	defer srv.Close()
+
+	c := New("nt_live_k", WithBaseURL(srv.URL))
+	if _, err := c.Inbound.Folders.Create(context.Background(), "Follow up"); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := c.Inbound.Folders.Update(context.Background(), "f1", "Later"); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	page, err := c.Inbound.Folders.List(context.Background())
+	if err != nil || page.Counts.Unread != 1 || page.RouteUnread["8a2b"] != 1 {
+		t.Fatalf("list: %+v, %v", page, err)
+	}
+	if err := c.Inbound.Folders.Delete(context.Background(), "f1"); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if len(calls) != 4 || calls[1] != "PATCH /v1/inbound/folders/f1" || calls[3] != "DELETE /v1/inbound/folders/f1" {
+		t.Fatalf("calls = %v", calls)
 	}
 }

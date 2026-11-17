@@ -17,6 +17,7 @@ type Client struct {
 	http       *http.Client
 
 	Emails      *EmailsService
+	Events      *EventsService
 	WhatsApp    *WhatsAppService
 	Contacts    *ContactsService
 	Webhooks    *WebhooksService
@@ -53,6 +54,7 @@ func New(apiKey string, opts ...Option) *Client {
 		o(c)
 	}
 	c.Emails = &EmailsService{client: c}
+	c.Events = &EventsService{client: c}
 	c.WhatsApp = &WhatsAppService{client: c}
 	c.Contacts = &ContactsService{client: c}
 	c.Webhooks = &WebhooksService{client: c, Deliveries: &WebhookDeliveriesService{client: c}}
@@ -60,6 +62,7 @@ func New(apiKey string, opts ...Option) *Client {
 		client:   c,
 		Routes:   &InboundRoutesService{client: c},
 		Messages: &InboundMessagesService{client: c},
+		Folders:  &InboundFoldersService{client: c},
 	}
 	c.Unsubscribe = &UnsubscribeService{client: c}
 	c.Plans = &PlansService{client: c}

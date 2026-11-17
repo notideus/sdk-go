@@ -7,6 +7,8 @@ import "context"
 type SendEmailParams struct {
 	From           string            `json:"from"`
 	To             []string          `json:"to"`
+	CC             []string          `json:"cc,omitempty"`
+	BCC            []string          `json:"bcc,omitempty"`
 	Subject        string            `json:"subject"`
 	HTML           string            `json:"html,omitempty"`
 	Text           string            `json:"text,omitempty"`
@@ -28,6 +30,8 @@ type Email struct {
 	TemplateID       *string           `json:"template_id"`
 	FromAddress      string            `json:"from_address"`
 	ToEmails         []string          `json:"to_emails"`
+	CcEmails         []string          `json:"cc_emails"`
+	BccEmails        []string          `json:"bcc_emails"`
 	Subject          string            `json:"subject"`
 	HTML             string            `json:"html"`
 	SizeKb           float64           `json:"size_kb"`
