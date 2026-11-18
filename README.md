@@ -100,19 +100,6 @@ result, err := client.Events.Send(ctx, notideus.SendEventParams{
 
 Top-level payload fields fill matching template variables; `{{email}}` and `{{event_name}}` are built in. Replaying an `IdempotencyKey` returns the same event with `Created: false` and never creates a duplicate run.
 
-### WhatsApp messages
-
-```go
-client.WhatsApp.Messages.Send(ctx, notideus.SendWhatsAppMessageParams{
-	TemplateID: "tpl-1",
-	To:         []string{"+33612345678"},
-	Parameters: map[string]string{"body:1": "Jane"},
-})
-client.WhatsApp.Messages.SendBatch(ctx, []notideus.SendWhatsAppMessageParams{…})
-```
-
-`Send` returns one entry per recipient, in `To` order.
-
 ### Contacts
 
 ```go
